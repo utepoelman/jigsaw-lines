@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linear Equation Jigsaw</title>
+    <style>
+        :root {
+            --piece-size: 150px;
+            --gap-size: 4px;
+            --bg-color: #f8fafc;
+            --accent-color: #2563eb;
+            --success-color: #22c55e;
+            --error-color: #ef4444;
+            --grid-border: #334155;
+            --bronze-color: #b45309; 
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header { text-align: center; margin-bottom: 20px; }
+        h1 { margin: 0 0 10px 0; color: #1e293b; }
+        p { margin: 0; color: #64748b; }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 10px 0 20px 0;
+            position: sticky;
+            top: 10px;
+            z-index: 100;
+            background: rgba(255,255,255,0.9);
+            padding: 10px 25px;
+            border-radius: 50px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            backdrop-filter: blur(5px);
+            transition: opacity 0.5s;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s;
+            font-size: 14px;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-primary { background: var(--accent-color); color: white; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-info { background: #0ea5e9; color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* --- Main Layout --- */
+        .game-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 40px;
+            justify-content: center;
+            width: 100%;
+            max-width: 1400px;
+            transition: filter 0.3s;
+        }
+        
+        /* Blur class for pausing */
+        .game-blurred {
+            filter: blur(12px);
+            pointer-events: none; /* Prevents clicking/dragging while paused */
+            user-select: none;
+        }
+
+        /* Workspace */
+        .workspace-area {
+            flex: 1;
+            min-width: 350px;
+            min-height: 500px;
+            background: white;
+            border: 3px dashed #cbd5e1;
+            border-radius: 16px;
+            position: relative;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.02);
+        }
+        .workspace-label {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #e2e8f0; font-size: 1.5rem; font-weight: 700;
+            pointer-events: none; user-select: none;
+        }
+
+        /* Grid Wrapper */
+        .grid-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .grid-wrapper {
+            position: relative;
+            padding: 0; margin: 0;
+            border: 4px solid var(--grid-border);
+            background-color: var(--grid-border);
+            border-radius: 4px;
+        }
+
+        #puzzle-grid {
+            display: grid;
+            grid-template-columns: repeat(3, var(--piece-size));
+            grid-template-rows: repeat(3, var(--piece-size));
+            gap: var(--gap-size);
+            background-color: var(--grid-border);
+        }
+
+        .grid-slot {
+            width: var(--piece-size);
+            height: var(--piece-size);
+            background-color: #f1f5f9;
+            position: relative;
+        }
+
+        /* --- Highlights --- */
+        #overlay-layer {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; z-index: 50;
+        }
+
+        .edge { position: absolute; z-index: 60; border-radius: 4px; pointer-events: none; }
+        .edge-h { 
+            height: 10px; width: var(--piece-size); 
+            transform: translate(-50%, -50%); 
+        } 
+        .edge-v { 
+            width: 10px; height: var(--piece-size); 
+            transform: translate(-50%, -50%); 
+        } 
+        
+        .bg-green { background-color: var(--success-color); box-shadow: 0 0 10px var(--success-color); }
+        .bg-red { background-color: var(--error-color); box-shadow: 0 0 10px var(--error-color); }
+
+        /* --- Pieces --- */
+        .piece {
+            width: var(--piece-size); height: var(--piece-size);
+            background: white; border: 1px solid #94a3b8;
+            box-sizing: border-box;
+            display: grid;
+            grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+            user-select: none; cursor: grab;
+            position: absolute; z-index: 10;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .piece:active { cursor: grabbing; z-index: 100; transform: scale(1.02); }
+        .piece.in-slot {
+            position: relative; top: 0 !important; left: 0 !important;
+            width: 100%; height: 100%; border: none; box-shadow: none;
+        }
+
+        /* Text Styling inside quadrants */
+        .quadrant {
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; /* Larger font */
+            padding: 1px; 
+            overflow: hidden;
+            font-family: 'Arial Narrow', 'Roboto Condensed', 'Oswald', sans-serif-condensed, sans-serif;
+            font-stretch: condensed;
+        }
+        .q-tl { border-right: 1px dotted #cbd5e1; border-bottom: 1px dotted #cbd5e1; color: #d97706; font-weight: bold; }
+        .q-tr { border-bottom: 1px dotted #cbd5e1; }
+        
+        .q-bl { 
+            border-right: 1px dotted #cbd5e1; 
+            color: var(--accent-color); 
+            font-weight: bold; 
+            font-size: 14px; /* Larger font */
+            white-space: nowrap; 
+        }
+        .q-br { color: #d97706; font-weight: bold; }
+        .graph-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+
+        /* --- Modal (Generic) --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 200;
+            display: none; align-items: center; justify-content: center;
+        }
+        .modal-box {
+            background: white; padding: 30px; border-radius: 12px;
+            text-align: center; max-width: 500px; width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .modal-body {
+            overflow-y: auto;
+            text-align: left;
+            padding-right: 10px;
+            margin-bottom: 20px;
+        }
+
+        .modal-box h2 { color: var(--accent-color); margin-top: 0; }
+        .modal-box h3 { font-size: 16px; margin-top: 15px; margin-bottom: 5px; color: #334155; }
+        .modal-box p, .modal-box ul { font-size: 14px; color: #475569; line-height: 1.5; margin-bottom: 10px; }
+        .modal-box ul { padding-left: 20px; margin-top: 0; }
+        .legal-text { font-size: 12px !important; color: #64748b !important; border-top: 1px solid #e2e8f0; padding-top: 10px; margin-top: 15px; }
+
+        .input-group { margin: 20px 0; text-align: center; }
+        .input-group input {
+            padding: 10px; border: 2px solid #cbd5e1; border-radius: 6px;
+            width: 80%; font-size: 16px;
+        }
+
+        #certificate-container {
+            display: none;
+            box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.2);
+            border: 8px solid var(--bronze-color);
+            margin-top: 20px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Linear Equation Jigsaw</h1>
+        <p>Corners that meet must share the same linear function.</p>
+    </header>
+
+    <div class="toolbar" id="mainToolbar">
+        <button class="btn btn-info" onclick="toggleHelp()">? How to Play</button>
+        <div style="width: 1px; background:#cbd5e1; margin: 0 10px; height: 30px;"></div>
+        <button class="btn btn-secondary" id="undoBtn" onclick="undo()" disabled>&#8630; Undo</button>
+        <button class="btn btn-secondary" id="redoBtn" onclick="redo()" disabled>&#8631; Redo</button>
+        <div style="width: 1px; background:#cbd5e1; margin: 0 10px; height: 30px;"></div>
+        <button class="btn btn-primary" id="checkBtn" onclick="checkConnections()">Check Solution</button>
+    </div>
+
+    <div class="game-container" id="gameContainer">
+        <div class="workspace-area" id="workspace" ondragover="allowDrop(event)" ondrop="dropInWorkspace(event)">
+            <div class="workspace-label">Workspace</div>
+        </div>
+
+        <div class="grid-area" id="gridArea">
+            
+            <div class="grid-wrapper" id="grid-wrapper">
+                <div id="puzzle-grid"></div>
+                <div id="overlay-layer"></div>
+            </div>
+
+            <canvas id="certificate-container" width="600" height="450"></canvas>
+
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal-box">
+            <h2>How to Play</h2>
+            <div class="modal-body">
+                <p><strong>Goal:</strong> Assemble the 3x3 grid so that every touching edge shares the same linear function.</p>
+                <ul>
+                    <li>Drag pieces from the Workspace to the Grid.</li>
+                    <li>Match a Graph (Top Right) to a Point (Bottom Left), or an Equation to a Coordinate, etc.</li>
+                    <li>Click <strong>Check Solution</strong> to test your arrangement.</li>
+                    <li><strong>The Timer is PAUSED</strong> while this window is open.</li>
+                </ul>
+
+                <div class="legal-text">
+                    <h3>Terms of Use</h3>
+                    <p><strong>Ownership and Copyright:</strong> This game, including all code, assets, artwork, and sound, is the intellectual property of Ute Poelman. All rights are reserved.</p>
+                    
+                    <p><strong>License to Use:</strong> Subject to these terms, the author grants you a personal, non-exclusive, non-transferable license to access and play the game for your own private, non-commercial entertainment. Educational use is explicitly permitted: Teachers, schools, and educational institutions may use this game in classroom settings and share it with students for teaching purposes at no cost.</p>
+                    
+                    <p><strong>Restrictions:</strong> You are strictly prohibited from:</p>
+                    <ul>
+                        <li>Modifying the source code, assets, or logic of this game</li>
+                        <li>Redistributing or "mirroring" the game files on other websites without express written permission</li>
+                        <li>Selling or commercialising the game or any derivative works based upon it</li>
+                        <li>Removing any copyright notices or branding from the source code or game interface</li>
+                    </ul>
+                    
+                    <p><strong>Disclaimer:</strong> The game is provided "as is," without warranty of any kind. The author is not liable for any damages arising from the use of this software.</p>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="toggleHelp()">Resume Game</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="victoryModal">
+        <div class="modal-box">
+            <h2 style="color:var(--success-color)">🎉 Puzzle Solved!</h2>
+            <p>Excellent work! All equations match.</p>
+            <p>Enter your name to claim your certificate.</p>
+            <div class="input-group">
+                <input type="text" id="studentName" placeholder="Your Name" maxlength="25">
+            </div>
+            <button class="btn btn-primary" onclick="claimCertificate()">Claim Certificate</button>
+        </div>
+    </div>
+
+<script>
+    // --- Config ---
+    const GRID_SIZE = 3; 
+    const PIECE_SIZE = 150; 
+    const GAP_SIZE = 4;
+    const TOTAL_INTERNAL_EDGES = 12;
+
+    let pieces = []; 
+    let historyStack = [];
+    let historyIndex = -1;
+    let isHistoryAction = false;
+    let isGameWon = false;
+
+    // --- Timer State ---
+    let startTime;
+    let totalPausedTime = 0;
+    let pauseStartTimestamp = 0;
+    let isPaused = false;
+    let puzzleDurationStr = "";
+
+    // --- Math Engine ---
+    function generateEquation() {
+        const slopes = [-2, -1, -0.5, 0, 0.5, 1, 2];
+        const intercepts = [-3, -2, -1, 0, 1, 2, 3];
+        const m = slopes[Math.floor(Math.random() * slopes.length)];
+        const c = intercepts[Math.floor(Math.random() * intercepts.length)];
+        return { m, c, id: Math.random().toString(36).substr(2, 9) };
+    }
+
+    function formatEquation(eq) {
+        let mStr = "";
+        if (eq.m === 0) return `y = ${eq.c}`;
+        if (eq.m === 1) mStr = "x";
+        else if (eq.m === -1) mStr = "-x";
+        else mStr = `${eq.m}x`;
+        if (eq.c === 0) return `y = ${mStr}`;
+        return `y = ${mStr} ${eq.c > 0 ? "+" : "-"} ${Math.abs(eq.c)}`;
+    }
+
+    function getPointOnLine(eq) {
+        let attempts = 0, x, y;
+        do {
+            x = Math.floor(Math.random() * 9) - 4; 
+            y = eq.m * x + eq.c;
+            attempts++;
+        } while ((Math.abs(y) > 6 || !Number.isInteger(y)) && attempts < 20);
+        y = Math.round(y * 10) / 10;
+        return `(${x}, ${y})`;
+    }
+
+    function generateGraphImage(eq) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 150; canvas.height = 150;
+        const ctx = canvas.getContext('2d');
+        const w = 150, h = 150;
+        const range = 5; // -5 to +5
+        const scale = w / (2 * range);
+        const center = w / 2;
+
+        ctx.fillStyle = "#fff"; ctx.fillRect(0,0,w,h);
+        
+        // --- Draw Grid ---
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 1;
+        for (let i = -range; i <= range; i++) {
+            // Vertical Lines
+            ctx.beginPath();
+            ctx.moveTo(center + i * scale, 0);
+            ctx.lineTo(center + i * scale, h);
+            ctx.stroke();
+
+            // Horizontal Lines
+            ctx.beginPath();
+            ctx.moveTo(0, center - i * scale);
+            ctx.lineTo(w, center - i * scale);
+            ctx.stroke();
+        }
+
+        // --- Draw Axes ---
+        ctx.strokeStyle = "#94a3b8"; // Darker grey for axes
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(center, 0); ctx.lineTo(center, h);
+        ctx.moveTo(0, center); ctx.lineTo(w, center);
+        ctx.stroke();
+
+        // --- Draw Function Line ---
+        ctx.strokeStyle = "#dc2626"; // Red line
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        const x1 = -range, y1 = eq.m * x1 + eq.c;
+        const x2 = range, y2 = eq.m * x2 + eq.c;
+        ctx.moveTo(center + x1*scale, center - y1*scale);
+        ctx.lineTo(center + x2*scale, center - y2*scale);
+        ctx.stroke();
+
+        return canvas.toDataURL(); 
+    }
+
+    // --- Init ---
+    function initGame() {
+        const grid = document.getElementById('puzzle-grid');
+        grid.innerHTML = '';
+        pieces = [];
+        isGameWon = false;
+        
+        // Start tracking time
+        startTime = Date.now();
+        totalPausedTime = 0;
+        isPaused = false;
+
+        let vertices = [];
+        for(let r=0; r<=GRID_SIZE; r++){
+            vertices[r] = [];
+            for(let c=0; c<=GRID_SIZE; c++){
+                vertices[r][c] = generateEquation();
+            }
+        }
+
+        let pId = 0;
+        for(let r=0; r<GRID_SIZE; r++){
+            for(let c=0; c<GRID_SIZE; c++){
+                const eqTL = vertices[r][c];
+                const eqTR = vertices[r][c+1];
+                const eqBL = vertices[r+1][c];
+                const eqBR = vertices[r+1][c+1];
+
+                const pieceData = {
+                    id: `p-${pId}`,
+                    cornerIds: { tl: eqTL.id, tr: eqTR.id, bl: eqBL.id, br: eqBR.id },
+                    content: {
+                        tl: getPointOnLine(eqTL),
+                        tr: generateGraphImage(eqTR),
+                        bl: formatEquation(eqBL),
+                        br: getPointOnLine(eqBR)
+                    }
+                };
+                pieces.push(pieceData);
+                
+                const slot = document.createElement('div');
+                slot.className = 'grid-slot';
+                slot.id = `slot-${pId}`;
+                slot.addEventListener('dragover', allowDrop);
+                slot.addEventListener('drop', dropInGrid);
+                grid.appendChild(slot);
+                pId++;
+            }
+        }
+
+        const workspace = document.getElementById('workspace');
+        pieces.sort(() => Math.random() - 0.5);
+        
+        pieces.forEach((p, i) => {
+            const el = createPieceDOM(p);
+            const col = i % 3;
+            const row = Math.floor(i / 3);
+            el.style.left = (20 + col * 160) + 'px';
+            el.style.top = (20 + row * 160) + 'px';
+            workspace.appendChild(el);
+        });
+
+        recordHistory();
+    }
+
+    function createPieceDOM(data) {
+        const div = document.createElement('div');
+        div.className = 'piece';
+        div.id = data.id;
+        div.draggable = true;
+        div.dataset.cornerIds = JSON.stringify(data.cornerIds); 
+
+        div.addEventListener('dragstart', dragStart);
+
+        const tl = document.createElement('div'); tl.className = 'quadrant q-tl'; tl.innerText = data.content.tl;
+        const tr = document.createElement('div'); tr.className = 'quadrant q-tr';
+        const img = document.createElement('img'); img.src = data.content.tr; img.className = 'graph-img'; tr.appendChild(img);
+        const bl = document.createElement('div'); bl.className = 'quadrant q-bl'; bl.innerText = data.content.bl;
+        const br = document.createElement('div'); br.className = 'quadrant q-br'; br.innerText = data.content.br;
+
+        div.append(tl, tr, bl, br);
+        return div;
+    }
+
+    // --- UI & Modals ---
+
+    function toggleHelp() {
+        const modal = document.getElementById('helpModal');
+        const gameContainer = document.getElementById('gameContainer');
+        
+        if (isPaused) {
+            // Resume Game
+            modal.style.display = 'none';
+            gameContainer.classList.remove('game-blurred');
+            
+            // Calculate how long we were paused and add to total
+            const pauseDuration = Date.now() - pauseStartTimestamp;
+            totalPausedTime += pauseDuration;
+            
+            isPaused = false;
+        } else {
+            // Pause Game
+            modal.style.display = 'flex';
+            gameContainer.classList.add('game-blurred');
+            
+            // Mark when pause started
+            pauseStartTimestamp = Date.now();
+            isPaused = true;
+        }
+    }
+
+    // --- Drag & Drop ---
+    let draggedId = null;
+    let dragOffsetX = 0, dragOffsetY = 0;
+
+    function dragStart(ev) {
+        if(isGameWon || isPaused) { ev.preventDefault(); return; }
+        draggedId = ev.target.id;
+        const rect = ev.target.getBoundingClientRect();
+        dragOffsetX = ev.clientX - rect.left;
+        dragOffsetY = ev.clientY - rect.top;
+        ev.dataTransfer.effectAllowed = "move";
+        ev.dataTransfer.setData("text/plain", draggedId);
+    }
+
+    function allowDrop(ev) { ev.preventDefault(); }
+
+    function dropInWorkspace(ev) {
+        ev.preventDefault();
+        if(isPaused) return;
+
+        const workspace = document.getElementById('workspace');
+        const piece = document.getElementById(draggedId);
+        
+        const wsRect = workspace.getBoundingClientRect();
+        let x = ev.clientX - wsRect.left - dragOffsetX;
+        let y = ev.clientY - wsRect.top - dragOffsetY;
+
+        x = Math.max(0, Math.min(x, wsRect.width - PIECE_SIZE));
+        y = Math.max(0, Math.min(y, wsRect.height - PIECE_SIZE));
+
+        piece.classList.remove('in-slot');
+        piece.style.left = x + 'px';
+        piece.style.top = y + 'px';
+
+        if(piece.parentNode !== workspace) workspace.appendChild(piece);
+        if(!isHistoryAction) recordHistory();
+    }
+
+    function dropInGrid(ev) {
+        ev.preventDefault();
+        if(isPaused) return;
+
+        let targetSlot = ev.target.closest('.grid-slot');
+        if (!targetSlot) return;
+
+        const piece = document.getElementById(draggedId);
+        const oldParent = piece.parentNode;
+
+        if (targetSlot.children.length === 0) {
+            placeInSlot(piece, targetSlot);
+        } else {
+            const resident = targetSlot.children[0];
+            if (oldParent.id === 'workspace') {
+                sendToWorkspace(resident);
+                placeInSlot(piece, targetSlot);
+            } else {
+                const sourceSlot = oldParent;
+                placeInSlot(resident, sourceSlot);
+                placeInSlot(piece, targetSlot);
+            }
+        }
+        if(!isHistoryAction) recordHistory();
+    }
+
+    function placeInSlot(piece, slot) {
+        piece.classList.add('in-slot');
+        piece.style.left = ''; piece.style.top = '';
+        slot.appendChild(piece);
+    }
+
+    function sendToWorkspace(piece) {
+        const workspace = document.getElementById('workspace');
+        piece.classList.remove('in-slot');
+        piece.style.left = '20px'; piece.style.top = '20px';
+        workspace.appendChild(piece);
+    }
+
+    // --- Logic & Victory ---
+
+    function checkConnections() {
+        if(isGameWon || isPaused) return;
+
+        const overlay = document.getElementById('overlay-layer');
+        overlay.innerHTML = ''; 
+
+        const getPieceData = (r, c) => {
+            const index = r * GRID_SIZE + c;
+            const slots = document.querySelectorAll('.grid-slot');
+            if (index < 0 || index >= slots.length) return null;
+            const slot = slots[index];
+            if (slot && slot.children.length > 0) {
+                return JSON.parse(slot.children[0].dataset.cornerIds);
+            }
+            return null;
+        };
+
+        let successfulEdges = 0;
+
+        // Vertical
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE - 1; c++) {
+                const pLeft = getPieceData(r, c);
+                const pRight = getPieceData(r, c+1);
+                
+                if (pLeft && pRight) {
+                    const matchTop = pLeft.tr === pRight.tl;
+                    const matchBtm = pLeft.br === pRight.bl;
+                    const line = document.createElement('div');
+                    const isGreen = matchTop && matchBtm;
+                    line.className = `edge edge-v ${isGreen ? 'bg-green' : 'bg-red'}`;
+                    if(isGreen) successfulEdges++;
+                    const centerX = (c + 1) * PIECE_SIZE + (c * GAP_SIZE) + (GAP_SIZE / 2);
+                    const centerY = r * (PIECE_SIZE + GAP_SIZE) + (PIECE_SIZE / 2);
+                    line.style.left = centerX + 'px';
+                    line.style.top = centerY + 'px';
+                    overlay.appendChild(line);
+                }
+            }
+        }
+
+        // Horizontal
+        for (let r = 0; r < GRID_SIZE - 1; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                const pTop = getPieceData(r, c);
+                const pBtm = getPieceData(r+1, c);
+                
+                if (pTop && pBtm) {
+                    const matchLeft = pTop.bl === pBtm.tl;
+                    const matchRight = pTop.br === pBtm.tr;
+                    const line = document.createElement('div');
+                    const isGreen = matchLeft && matchRight;
+                    line.className = `edge edge-h ${isGreen ? 'bg-green' : 'bg-red'}`;
+                    if(isGreen) successfulEdges++;
+                    const centerX = c * (PIECE_SIZE + GAP_SIZE) + (PIECE_SIZE / 2);
+                    const centerY = (r + 1) * PIECE_SIZE + (r * GAP_SIZE) + (GAP_SIZE / 2);
+                    line.style.left = centerX + 'px';
+                    line.style.top = centerY + 'px';
+                    overlay.appendChild(line);
+                }
+            }
+        }
+
+        if (successfulEdges === TOTAL_INTERNAL_EDGES) {
+            isGameWon = true;
+            setTimeout(() => {
+                document.getElementById('victoryModal').style.display = 'flex';
+            }, 500);
+        } else {
+            setTimeout(() => { overlay.innerHTML = ''; }, 2500);
+        }
+    }
+
+    // --- Certificate ---
+
+    function claimCertificate() {
+        const nameInput = document.getElementById('studentName');
+        const name = nameInput.value.trim();
+        if(!name) { alert("Please enter a name!"); return; }
+
+        // Calculate Duration (Current Time - Start Time - Total Paused Time)
+        const endTime = Date.now();
+        const durationMs = endTime - startTime - totalPausedTime;
+        
+        // Safety check if user played very fast or logic quirk
+        const safeDuration = Math.max(0, durationMs);
+        
+        const minutes = Math.floor(safeDuration / 60000);
+        const seconds = Math.floor((safeDuration % 60000) / 1000);
+        puzzleDurationStr = `${minutes} min ${seconds} sec`;
+
+        document.getElementById('victoryModal').style.display = 'none';
+        document.getElementById('mainToolbar').style.display = 'none';
+        document.getElementById('workspace').style.display = 'none';
+        document.getElementById('grid-wrapper').style.display = 'none';
+
+        const cvs = document.getElementById('certificate-container');
+        cvs.style.display = 'block';
+
+        renderCertificate(cvs, name);
+    }
+
+    function renderCertificate(canvas, name) {
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+
+        // Background
+        ctx.fillStyle = "#fffbeb"; 
+        ctx.fillRect(0, 0, w, h);
+
+        // Border
+        ctx.strokeStyle = "#b45309";
+        ctx.lineWidth = 10;
+        ctx.strokeRect(10, 10, w-20, h-20);
+        ctx.strokeStyle = "#fcd34d";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(18, 18, w-36, h-36);
+
+        // Header
+        ctx.fillStyle = "#1e293b";
+        ctx.textAlign = "center";
+        
+        ctx.font = "bold 40px serif";
+        ctx.fillText("Certificate of Completion", w/2, 100);
+
+        ctx.font = "italic 20px sans-serif";
+        ctx.fillStyle = "#64748b";
+        ctx.fillText("This is to certify that", w/2, 160);
+
+        // Name (Bronze)
+        ctx.font = "bold italic 50px serif";
+        ctx.fillStyle = "#b45309"; 
+        ctx.fillText(name, w/2, 230);
+
+        ctx.font = "20px sans-serif";
+        ctx.fillStyle = "#64748b";
+        ctx.fillText("has successfully solved the", w/2, 290);
+        ctx.font = "bold 24px sans-serif";
+        ctx.fillStyle = "#1e293b";
+        ctx.fillText("Linear Equation Jigsaw", w/2, 330);
+
+        // Time and Date
+        const now = new Date();
+        const dateStr = now.toLocaleDateString();
+        const timeStr = now.toLocaleTimeString();
+
+        ctx.font = "16px sans-serif";
+        ctx.fillStyle = "#94a3b8"; // Light grey
+        ctx.fillText(`Date: ${dateStr}  |  Time: ${timeStr}`, w/2, 400);
+
+        // Duration (Subtle)
+        ctx.font = "14px sans-serif";
+        ctx.fillStyle = "#cbd5e1"; // Very light grey/subtle
+        ctx.fillText(`Duration: ${puzzleDurationStr}`, w/2, 430);
+    }
+
+    // --- History ---
+    function recordHistory() {
+        if (isHistoryAction) return;
+        if (historyIndex < historyStack.length - 1) historyStack.splice(historyIndex + 1);
+
+        const state = pieces.map(pData => {
+            const el = document.getElementById(pData.id);
+            const parent = el.parentNode;
+            return {
+                id: pData.id,
+                parentId: parent.id,
+                left: el.style.left,
+                top: el.style.top,
+                inSlot: el.classList.contains('in-slot')
+            };
+        });
+
+        historyStack.push(JSON.stringify(state));
+        historyIndex++;
+        updateBtns();
+    }
+
+    function applyState(jsonStr) {
+        if(isGameWon || isPaused) return; 
+        isHistoryAction = true;
+        const state = JSON.parse(jsonStr);
+        state.forEach(item => {
+            const el = document.getElementById(item.id);
+            const parent = document.getElementById(item.parentId);
+            if(el.parentNode !== parent) parent.appendChild(el);
+            
+            if(item.inSlot) {
+                el.classList.add('in-slot');
+                el.style.left = ''; el.style.top = '';
+            } else {
+                el.classList.remove('in-slot');
+                el.style.left = item.left; el.style.top = item.top;
+            }
+        });
+        isHistoryAction = false;
+        updateBtns();
+    }
+
+    function undo() { if (historyIndex > 0) { historyIndex--; applyState(historyStack[historyIndex]); } }
+    function redo() { if (historyIndex < historyStack.length - 1) { historyIndex++; applyState(historyStack[historyIndex]); } }
+    function updateBtns() {
+        if(isGameWon) return;
+        document.getElementById('undoBtn').disabled = historyIndex <= 0;
+        document.getElementById('redoBtn').disabled = historyIndex >= historyStack.length - 1;
+    }
+
+    window.onload = initGame;
+
+</script>
+</body>
+</html>
