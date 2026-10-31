@@ -61,6 +61,7 @@
         .btn:active { transform: scale(0.95); }
         .btn-primary { background: var(--accent-color); color: white; }
         .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-outline { background: transparent; border: 2px solid #cbd5e1; color: #64748b; }
         .btn-info { background: #0ea5e9; color: white; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -189,6 +190,28 @@
         .q-br { color: #d97706; font-weight: bold; }
         .graph-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 
+        /* --- Printable Worksheet Modal Styles --- */
+        .print-modal-box {
+            max-width: 650px;
+            width: 95%;
+        }
+        .print-header { text-align: center; margin-bottom: 15px; }
+        .print-title { margin: 0 0 5px 0; color: #1e293b; font-size: 1.4rem; }
+        .print-subtitle { color: #475569; margin: 0 0 15px 0; font-size: 0.85rem; line-height: 1.3; }
+
+        #print-puzzle-grid {
+            display: grid;
+            grid-template-columns: repeat(3, var(--piece-size));
+            grid-template-rows: repeat(3, var(--piece-size));
+            gap: 0;
+            border: 2px solid #1e293b;
+            background: white;
+            margin: 0 auto;
+            width: calc(var(--piece-size) * 3);
+            height: calc(var(--piece-size) * 3);
+            box-sizing: content-box;
+        }
+
         /* --- Modal (Generic) --- */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -230,6 +253,80 @@
             margin-top: 20px;
         }
 
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 1cm;
+            }
+            body { 
+                background: white !important; 
+                height: auto !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                display: block !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            header, .toolbar, .game-container, .modal-overlay, #certificate-container, .no-print { display: none !important; }
+
+            /* Worksheet Mode - Maximize piece size to fill 190mm (210mm width - 2cm margins) */
+            body.mode-print-sheet {
+                --piece-size: 63.33mm !important; /* 190mm / 3 = 63.33mm */
+            }
+            body.mode-print-sheet #printModal {
+                display: flex !important;
+                position: static !important;
+                background: transparent !important;
+                padding: 0 !important;
+                backdrop-filter: none !important;
+                box-shadow: none !important;
+                width: 100% !important;
+            }
+            body.mode-print-sheet .print-modal-box {
+                box-shadow: none !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+                max-height: none !important;
+                width: 100% !important;
+                border: none !important;
+                background: transparent !important;
+            }
+            body.mode-print-sheet #print-sheet-content {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                width: 100% !important;
+            }
+            body.mode-print-sheet .print-header {
+                margin-bottom: 10px !important;
+            }
+            body.mode-print-sheet .print-title {
+                font-size: 1.5rem !important;
+                margin-bottom: 4px !important;
+            }
+            body.mode-print-sheet .print-subtitle {
+                font-size: 0.85rem !important;
+                margin-bottom: 12px !important;
+            }
+            body.mode-print-sheet #print-puzzle-grid {
+                display: grid !important;
+                grid-template-columns: repeat(3, 63.33mm) !important;
+                grid-template-rows: repeat(3, 63.33mm) !important;
+                width: 190mm !important;
+                height: 190mm !important;
+                margin: 0 auto !important;
+                box-sizing: content-box !important;
+                border: 2px solid #000000 !important;
+            }
+            body.mode-print-sheet .piece {
+                width: 63.33mm !important;
+                height: 63.33mm !important;
+                border: 1px solid #000000 !important;
+                box-sizing: border-box !important;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -241,6 +338,7 @@
 
     <div class="toolbar" id="mainToolbar">
         <button class="btn btn-info" onclick="toggleHelp()">How to Play</button>
+        <button class="btn btn-secondary" onclick="openPrintModal()">Print Sheet</button>
         <div style="width: 1px; background:#cbd5e1; margin: 0 10px; height: 30px;"></div>
         <button class="btn btn-secondary" id="undoBtn" onclick="undo()" disabled>&#8630; Undo</button>
         <button class="btn btn-secondary" id="redoBtn" onclick="redo()" disabled>&#8631; Redo</button>
@@ -294,6 +392,26 @@
                 </div>
             </div>
             <button class="btn btn-primary" onclick="toggleHelp()">Resume Game</button>
+        </div>
+    </div>
+
+    <!-- Printable Worksheet Modal -->
+    <div class="modal-overlay" id="printModal">
+        <div class="modal-box print-modal-box">
+            <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; font-size: 1.2rem;">Printable Cut-Out Worksheet</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-primary" onclick="triggerPrintSheet()">Print / Save PDF</button>
+                    <button class="btn btn-outline" onclick="closePrintModal()">Close</button>
+                </div>
+            </div>
+            <div id="print-sheet-content">
+                <div class="print-header">
+                    <h1 class="print-title">Linear Equation Jigsaw</h1>
+                    <p class="print-subtitle">Cut out the 9 puzzle pieces below along the outer lines. Reassemble them into a 3&times;3 grid so that meeting corners share the same linear function!</p>
+                </div>
+                <div id="print-puzzle-grid"></div>
+            </div>
         </div>
     </div>
 
@@ -671,6 +789,86 @@
         }
     }
 
+    // --- Printable Sheet Logic (No edges match layout) ---
+
+    function hasAnyMatchingAdjacentEdges(grid) {
+        for (let r = 0; r < 3; r++) {
+            for (let c = 0; c < 3; c++) {
+                // Check right neighbor
+                if (c < 2) {
+                    const pLeft = grid[r][c];
+                    const pRight = grid[r][c + 1];
+                    if (pLeft.cornerIds.tr === pRight.cornerIds.tl || pLeft.cornerIds.br === pRight.cornerIds.bl) {
+                        return true;
+                    }
+                }
+                // Check bottom neighbor
+                if (r < 2) {
+                    const pTop = grid[r][c];
+                    const pBtm = grid[r + 1][c];
+                    if (pTop.cornerIds.bl === pBtm.cornerIds.tl || pTop.cornerIds.br === pBtm.cornerIds.tr) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    function getMismatchedLayout(piecesList) {
+        let pool = [...piecesList];
+        for (let attempt = 0; attempt < 2000; attempt++) {
+            pool.sort(() => Math.random() - 0.5);
+            let grid = [];
+            for (let r = 0; r < 3; r++) {
+                grid.push(pool.slice(r * 3, (r + 1) * 3));
+            }
+            if (!hasAnyMatchingAdjacentEdges(grid)) {
+                return grid;
+            }
+        }
+        return grid;
+    }
+
+    function generatePrintSheet() {
+        const gridContainer = document.getElementById('print-puzzle-grid');
+        gridContainer.innerHTML = '';
+
+        const gridData = getMismatchedLayout(pieces);
+
+        for (let r = 0; r < 3; r++) {
+            for (let c = 0; c < 3; c++) {
+                const pieceData = gridData[r][c];
+                const pieceEl = createPieceDOM(pieceData);
+                
+                pieceEl.style.position = 'relative';
+                pieceEl.style.left = '0';
+                pieceEl.style.top = '0';
+                pieceEl.style.boxShadow = 'none';
+                pieceEl.style.cursor = 'default';
+                pieceEl.style.zIndex = '1';
+                pieceEl.draggable = false;
+
+                gridContainer.appendChild(pieceEl);
+            }
+        }
+    }
+
+    function openPrintModal() {
+        document.body.classList.add('mode-print-sheet');
+        generatePrintSheet();
+        document.getElementById('printModal').style.display = 'flex';
+    }
+
+    function closePrintModal() {
+        document.getElementById('printModal').style.display = 'none';
+        document.body.classList.remove('mode-print-sheet');
+    }
+
+    function triggerPrintSheet() {
+        window.print();
+    }
+
     // --- Certificate ---
 
     function claimCertificate() {
@@ -802,6 +1000,7 @@
     function redo() { if (historyIndex < historyStack.length - 1) { historyIndex++; applyState(historyStack[historyIndex]); } }
     function updateBtns() {
         if(isGameWon) return;
+        document.getElementById('undoBtn').disabled = historyIndex <= 0;
         document.getElementById('undoBtn').disabled = historyIndex <= 0;
         document.getElementById('redoBtn').disabled = historyIndex >= historyStack.length - 1;
     }
